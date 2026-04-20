@@ -102,23 +102,23 @@ This study quantifies the relationship between solar flare activity and Starlink
 
 ### Flare Timeline
 
-![Flare Timeline](01_flare_timeline.png)
+![Flare Timeline](./plots/01_flare_timeline.png)
 
 ### Decay Distribution
 
-![Decay Distribution](02_decay_distribution.png)
+![Decay Distribution](./plots/02_decay_distribution.png)
 
 ### Decay Vs Flare Class
 
-![Decay Vs Flare Class](03_decay_vs_flare_class.png)
+![Decay Vs Flare Class](./plots/03_decay_vs_flare_class.png)
 
 ### Case Events
 
-![Case Events](04_case_events.png)
+![Case Events](./plots/04_case_events.png)
 
 ### Recovery Time
 
-![Recovery Time](05_recovery_time.png)
+![Recovery Time](./plots/05_recovery_time.png)
 
 ## Notable Events
 
