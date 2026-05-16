@@ -141,7 +141,7 @@ Operationally, a G5-class storm can induce altitude losses of >600 m/day. Based 
 ---
 
 ## 7. Data and Code Availability
-The processed Starlink decay dataset and NASA DONKI space weather metadata utilized in this study are archived on Zenodo at [DOI: 10.5281/zenodo.20236524](https://zenodo.org/record/20236524). The full analytical pipeline, including the SGP4 propagation and statistical alignment scripts, is available under the MIT License at [github.com/yoohooshantanu/starlink-flare-decay](https://github.com/yoohooshantanu/starlink-flare-decay).
+The processed Starlink decay dataset and NASA DONKI space weather metadata utilized in this study are archived on Zenodo at [DOI: 10.5281/zenodo.20236769](https://zenodo.org/record/20236769). The full analytical pipeline, including the SGP4 propagation and statistical alignment scripts, is available under the MIT License at [github.com/yoohooshantanu/starlink-flare-decay](https://github.com/yoohooshantanu/starlink-flare-decay).
 
 ---
 
