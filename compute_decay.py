@@ -1,5 +1,5 @@
 """
-Phase 3 — Compute Decay Rates from TLE History.
+Phase 3 - Compute Decay Rates from TLE History.
 
 Reads TLE records from the SQLite database, computes altitude
 from mean motion, and derives rolling decay rates in m/day.
@@ -86,12 +86,30 @@ def compute_rolling_decay(epochs: list[datetime], altitudes: list[float],
         # Maneuver detection: positive slope > threshold means active boost
         is_maneuver = bool(decay_m_day > config.MANEUVER_THRESHOLD)
 
+        # -- Orbital Mechanics Formalization --
+        # a = semi-major axis in meters
+        a_m = (alts[i] + config.R_EARTH) * 1000.0
+        v_m_s = math.sqrt(config.MU / a_m)
+        
+        # B = ballistic coefficient (m^2/kg)
+        B = config.STARLINK_B 
+        
+        # Implied Density (kg/m^3)
+        implied_density = 0.0
+        drag_acceleration = 0.0
+        if not is_maneuver and decay_m_day < 0:
+            abs_decay = abs(decay_m_day)
+            implied_density = abs_decay / (86400.0 * B * math.sqrt(config.MU * a_m))
+            drag_acceleration = 0.5 * implied_density * (v_m_s ** 2) * B
+
         results.append({
             "date": epochs[i].strftime("%Y-%m-%d"),
             "epoch": epochs[i].isoformat(),
             "altitude_km": round(alts[i], 4),
             "decay_rate_m_day": decay_m_day,
             "is_maneuver": is_maneuver,
+            "implied_density": float(f"{implied_density:.6e}"),
+            "drag_acceleration": float(f"{drag_acceleration:.6e}"),
         })
 
     return results
@@ -100,9 +118,9 @@ def compute_rolling_decay(epochs: list[datetime], altitudes: list[float],
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print("═" * 60)
-    print("Phase 3 — Computing Decay Rates from TLE History")
-    print("═" * 60)
+    print("=" * 60)
+    print("Phase 3 - Computing Decay Rates from TLE History")
+    print("=" * 60)
 
     conn = sqlite3.connect(str(config.TLE_DB))
 
@@ -130,7 +148,7 @@ def main():
         rows = cursor.fetchall()
 
         if len(rows) < 3:
-            print(f"  [{i}/{len(satellites)}] {name} (#{norad_id}) — too few records ({len(rows)}), skipping")
+            print(f"  [{i}/{len(satellites)}] {name} (#{norad_id}) - too few records ({len(rows)}), skipping")
             continue
 
         # Parse epochs and compute altitudes
@@ -177,7 +195,7 @@ def main():
         status = f"{len(decay_series)} pts"
         if sat_maneuvers:
             status += f", {sat_maneuvers} maneuvers"
-        print(f"  [{i}/{len(satellites)}] {name} (#{norad_id}) — {status}")
+        print(f"  [{i}/{len(satellites)}] {name} (#{norad_id}) - {status}")
 
     conn.close()
 

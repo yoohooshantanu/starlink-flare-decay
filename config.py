@@ -39,6 +39,12 @@ R_EARTH = 6371.0                    # km
 ROLLING_WINDOW_DAYS = 3             # for decay rate regression
 MANEUVER_THRESHOLD = 500            # m/day altitude increase → maneuver flag
 
+# ── Orbital Mechanics Parameters (Starlink V1.5 proxy) ──────────────────────
+STARLINK_MASS = 295.0               # kg
+STARLINK_AREA = 10.0                # m^2 (effective drag area)
+STARLINK_CD = 2.2                   # Drag coefficient
+STARLINK_B = (STARLINK_CD * STARLINK_AREA) / STARLINK_MASS  # Ballistic coeff m^2/kg
+
 # ── Analysis Windows (days relative to flare peak) ──────────────────────────
 WINDOWS = {
     "pre_flare":    (-7,   0),
@@ -67,6 +73,10 @@ PLOT_FILES = {
     "decay_vs_flare_class": PLOT_DIR / "03_decay_vs_flare_class.png",
     "case_events":          PLOT_DIR / "04_case_events.png",
     "recovery_time":        PLOT_DIR / "05_recovery_time.png",
+    "ensemble_response":    PLOT_DIR / "06_ensemble_response.png",
+    "regression_residuals": PLOT_DIR / "07_regression_residuals.png",
+    "lag_correlation":      PLOT_DIR / "08_lag_correlation.png",
+    "env_validation":       PLOT_DIR / "09_env_validation.png",
 }
 
 REPORT_FILE = BASE_DIR / "REPORT.md"

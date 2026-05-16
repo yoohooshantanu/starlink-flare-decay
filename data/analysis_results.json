@@ -1,0 +1,219 @@
+{
+  "meta": {
+    "total_records": 231417,
+    "starlink_records": 229646,
+    "control_records": 1771
+  },
+  "q1_flare_vs_pre": {
+    "description": "Does decay rate increase during flare windows?",
+    "n_pairs": 229646,
+    "pre_rate_mean": 8.4714,
+    "flare_rate_mean": 13.0234,
+    "acceleration_ratio": 1.537,
+    "paired_ttest": {
+      "statistic": 33.319623,
+      "p_value": 0.0
+    },
+    "wilcoxon": {
+      "statistic": 18362107623.5,
+      "p_value": 0.0
+    },
+    "cohens_d": 0.083
+  },
+  "q2_flare_class_scaling": {
+    "description": "Kruskal-Wallis: decay ratio across M1-M5 / M5-M9 / X1-X5 / X5+",
+    "kruskal_wallis": {
+      "statistic": 60.114227,
+      "p_value": 0.0
+    },
+    "groups": {
+      "M1-M5": {
+        "n": 168745,
+        "mean_ratio": 10.9736,
+        "median_ratio": 1.7106,
+        "std": 176.2194
+      },
+      "M5-M9": {
+        "n": 15844,
+        "mean_ratio": 9.5565,
+        "median_ratio": 1.7334,
+        "std": 91.2123
+      },
+      "X1-X5": {
+        "n": 8238,
+        "mean_ratio": 9.9361,
+        "median_ratio": 1.9139,
+        "std": 50.4915
+      },
+      "X5+": {
+        "n": 698,
+        "mean_ratio": 7.6742,
+        "median_ratio": 1.9697,
+        "std": 40.2754
+      }
+    },
+    "pairwise_mannwhitney": {
+      "M1-M5_vs_M5-M9": {
+        "statistic": 1327538392.5,
+        "p_value": 0.14877745
+      },
+      "M1-M5_vs_X1-X5": {
+        "statistic": 661224082.0,
+        "p_value": 0.0
+      },
+      "M1-M5_vs_X5+": {
+        "statistic": 56377395.0,
+        "p_value": 0.05119202
+      },
+      "M5-M9_vs_X1-X5": {
+        "statistic": 62542114.0,
+        "p_value": 1.1e-07
+      },
+      "M5-M9_vs_X5+": {
+        "statistic": 5336308.0,
+        "p_value": 0.11756356
+      },
+      "X1-X5_vs_X5+": {
+        "statistic": 2897267.5,
+        "p_value": 0.73437017
+      }
+    }
+  },
+  "lag_analysis": {
+    "description": "Days between flare peak and maximum observed decay rate",
+    "n_events": 229646,
+    "mean_lag_days": 2.56,
+    "median_lag_days": 3.0,
+    "mode_lag_days": 5.0
+  },
+  "multivariate_regression": {
+    "description": "OLS: DecayRate ~ log(Int) + Kp + F10.7 + Alt + Group",
+    "n": 229646,
+    "r_squared": 0.0099,
+    "adj_r_squared": 0.0099,
+    "params": {
+      "log_intensity": 1.3781,
+      "kp_sum": 0.1575,
+      "f107": 1.8218,
+      "altitude": -0.3194,
+      "is_shell2": 13.9882
+    },
+    "pvalues": {
+      "log_intensity": 0.00118094,
+      "kp_sum": 0.0,
+      "f107": 0.0,
+      "altitude": 0.0,
+      "is_shell2": 0.0
+    },
+    "summary_text": "                            OLS Regression Results                            \n==============================================================================\nDep. Variable:             decay_rate   R-squared:                       0.010\nModel:                            OLS   Adj. R-squared:                  0.010\nMethod:                 Least Squares   F-statistic:                     573.8\nDate:                Sat, 16 May 2026   Prob (F-statistic):               0.00\nTime:                        04:08:00   Log-Likelihood:            -1.2889e+06\nNo. Observations:              229646   AIC:                         2.578e+06\nDf Residuals:                  229641   BIC:                         2.578e+06\nDf Model:                           4                                         \nCovariance Type:            nonrobust                                         \n=================================================================================\n                    coef    std err          t      P>|t|      [0.025      0.975]\n---------------------------------------------------------------------------------\nlog_intensity     1.3781      0.425      3.243      0.001       0.545       2.211\nkp_sum            0.1575      0.015     10.710      0.000       0.129       0.186\nf107              1.8218      0.041     44.802      0.000       1.742       1.902\naltitude         -0.3194      0.007    -43.168      0.000      -0.334      -0.305\nis_shell2        13.9882      0.349     40.024      0.000      13.303      14.673\n==============================================================================\nOmnibus:                   635937.227   Durbin-Watson:                   1.701\nProb(Omnibus):                  0.000   Jarque-Bera (JB):      63615319828.301\nSkew:                          35.111   Prob(JB):                         0.00\nKurtosis:                    2580.484   Cond. No.                     1.75e+03\n==============================================================================\n\nNotes:\n[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.\n[2] The condition number is large, 1.75e+03. This might indicate that there are\nstrong multicollinearity or other numerical problems."
+  },
+  "q3_cme_vs_flare": {
+    "description": "Is CME-window decay larger than flare-window decay? (CME-linked events only)",
+    "n_pairs": 84764,
+    "flare_window_mean": 12.588,
+    "cme_window_mean": 11.2975,
+    "cme_to_flare_ratio": 0.897,
+    "paired_ttest": {
+      "statistic": -9.809157,
+      "p_value": 1.0
+    },
+    "wilcoxon": {
+      "statistic": 1462859130.0,
+      "p_value": 1.0
+    },
+    "cohens_d": -0.0225
+  },
+  "q4_recovery_time": {
+    "description": "Days until decay rate returns within 1-sigma of pre-flare baseline",
+    "groups": {
+      "M1-M5": {
+        "n_recovered": 168386,
+        "n_total": 169161,
+        "median_days": 3.0,
+        "mean_days": 4.1,
+        "pct_25": 3.0,
+        "pct_75": 4.0
+      },
+      "M5-M9": {
+        "n_recovered": 15766,
+        "n_total": 15878,
+        "median_days": 3.0,
+        "mean_days": 4.1,
+        "pct_25": 3.0,
+        "pct_75": 4.0
+      },
+      "X1-X5": {
+        "n_recovered": 8256,
+        "n_total": 8258,
+        "median_days": 3.0,
+        "mean_days": 4.2,
+        "pct_25": 3.0,
+        "pct_75": 4.0
+      },
+      "X5+": {
+        "n_recovered": 700,
+        "n_total": 700,
+        "median_days": 3.0,
+        "mean_days": 4.0,
+        "pct_25": 3.0,
+        "pct_75": 4.0
+      }
+    }
+  },
+  "control_validation": {
+    "description": "Same Q1 test on non-Starlink debris - confirms atmospheric drag signal",
+    "n_pairs": 1771,
+    "ctrl_pre_mean": 1954.1704,
+    "ctrl_flare_mean": 2129.9319,
+    "paired_ttest": {
+      "statistic": 5.354788,
+      "p_value": 5e-08
+    },
+    "wilcoxon": {
+      "statistic": 906075.0,
+      "p_value": 0.0
+    },
+    "cohens_d": 0.0603
+  },
+  "class_summary": {
+    "M": {
+      "n": 184590,
+      "mean_decay_ratio": 10.8519,
+      "median_decay_ratio": 1.7123,
+      "std": 170.593
+    },
+    "X": {
+      "n": 8936,
+      "mean_decay_ratio": 9.7594,
+      "median_decay_ratio": 1.9152,
+      "std": 49.7728
+    }
+  },
+  "sensitivity_analysis": {
+    "100": {
+      "n_points": 286469,
+      "mean_decay": 20.79,
+      "median_decay": 10.13
+    },
+    "250": {
+      "n_points": 288146,
+      "mean_decay": 21.51,
+      "median_decay": 10.22
+    },
+    "500": {
+      "n_points": 288786,
+      "mean_decay": 22.29,
+      "median_decay": 10.26
+    },
+    "1000": {
+      "n_points": 289647,
+      "mean_decay": 24.37,
+      "median_decay": 10.31
+    },
+    "2000": {
+      "n_points": 290398,
+      "mean_decay": 28.37,
+      "median_decay": 10.35
+    }
+  }
+}

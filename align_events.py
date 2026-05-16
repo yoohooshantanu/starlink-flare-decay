@@ -1,5 +1,5 @@
 """
-Phase 4 — Align Decay Windows with Flare Events.
+Phase 4 - Align Decay Windows with Flare Events.
 
 For each flare event × each satellite, extracts the mean decay rate
 in each analysis window (pre-flare, flare, CME, recovery) and
@@ -32,25 +32,35 @@ def parse_iso(s: str) -> datetime | None:
     return None
 
 
-def window_stats(rates: list[float]) -> dict:
-    """Compute summary stats for a list of decay rates."""
+def window_stats(rates: list[float], altitudes: list[float] = None, 
+                 densities: list[float] = None, drags: list[float] = None) -> dict:
+    """Compute summary stats for a list of decay rates and optional metrics."""
     if not rates:
         return {"mean": None, "median": None, "std": None, "n": 0}
-    arr = np.array(rates)
-    return {
-        "mean":   round(float(np.mean(arr)), 4),
-        "median": round(float(np.median(arr)), 4),
-        "std":    round(float(np.std(arr)), 4),
+    
+    res = {
+        "mean":   round(float(np.mean(rates)), 4),
+        "median": round(float(np.median(rates)), 4),
+        "std":    round(float(np.std(rates)), 4),
         "n":      len(rates),
     }
+    
+    if altitudes:
+        res["altitude_km"] = round(float(np.mean(altitudes)), 2)
+    if densities:
+        res["implied_density"] = float(f"{np.mean(densities):.6e}")
+    if drags:
+        res["drag_acceleration"] = float(f"{np.mean(drags):.6e}")
+        
+    return res
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    print("═" * 60)
-    print("Phase 4 — Aligning Decay Windows with Flare Events")
-    print("═" * 60)
+    print("=" * 60)
+    print("Phase 4 - Aligning Decay Windows with Flare Events")
+    print("=" * 60)
 
     # Load flare events
     with open(config.FLARE_FILE) as f:
@@ -106,27 +116,40 @@ def main():
             sat_dates = sat_decay[norad_id]
 
             # Extract rates for each window
-            window_rates = {}
+            window_metrics = defaultdict(lambda: {"rates": [], "altitudes": [], "densities": [], "drags": []})
             for wname, (w_start, w_end) in config.WINDOWS.items():
-                rates = []
                 for day_offset in range(w_start, w_end + 1):
                     target_date = (peak + timedelta(days=day_offset)).strftime("%Y-%m-%d")
                     if target_date in sat_dates:
                         for rec in sat_dates[target_date]:
                             if not rec.get("is_maneuver", False):
-                                rates.append(rec["decay_rate_m_day"])
-                window_rates[wname] = rates
+                                window_metrics[wname]["rates"].append(rec["decay_rate_m_day"])
+                                window_metrics[wname]["altitudes"].append(rec.get("altitude_km", 0))
+                                window_metrics[wname]["densities"].append(rec.get("implied_density", 0))
+                                window_metrics[wname]["drags"].append(rec.get("drag_acceleration", 0))
 
             # Need at least some data in pre-flare and flare windows
-            if not window_rates["pre_flare"] or not window_rates["flare_window"]:
+            if not window_metrics["pre_flare"]["rates"] or not window_metrics["flare_window"]["rates"]:
                 continue
 
-            pre_stats   = window_stats(window_rates["pre_flare"])
-            flare_stats = window_stats(window_rates["flare_window"])
-            cme_stats   = window_stats(window_rates["cme_window"])
-            rec_stats   = window_stats(window_rates["recovery"])
+            pre_stats   = window_stats(window_metrics["pre_flare"]["rates"], 
+                                     window_metrics["pre_flare"]["altitudes"],
+                                     window_metrics["pre_flare"]["densities"],
+                                     window_metrics["pre_flare"]["drags"])
+            flare_stats = window_stats(window_metrics["flare_window"]["rates"],
+                                     window_metrics["flare_window"]["altitudes"],
+                                     window_metrics["flare_window"]["densities"],
+                                     window_metrics["flare_window"]["drags"])
+            cme_stats   = window_stats(window_metrics["cme_window"]["rates"],
+                                     window_metrics["cme_window"]["altitudes"],
+                                     window_metrics["cme_window"]["densities"],
+                                     window_metrics["cme_window"]["drags"])
+            rec_stats   = window_stats(window_metrics["recovery"]["rates"],
+                                     window_metrics["recovery"]["altitudes"],
+                                     window_metrics["recovery"]["densities"],
+                                     window_metrics["recovery"]["drags"])
 
-            # Compute decay ratios (flare/pre — values > 1 = more negative = faster decay)
+            # Compute decay ratios (flare/pre - values > 1 = more negative = faster decay)
             # Since decay rates are negative, we use absolute values
             pre_abs = abs(pre_stats["mean"]) if pre_stats["mean"] else None
             flare_abs = abs(flare_stats["mean"]) if flare_stats["mean"] else None

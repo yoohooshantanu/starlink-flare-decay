@@ -148,21 +148,36 @@ def main():
     L.append("```text")
     L.append("fetch_flares.py      -> flare_events.json")
     L.append("fetch_tles.py        -> tle_history.db")
-    L.append("compute_decay.py     -> decay_rates.json")
+    L.append("compute_decay.py     -> decay_rates.json (incl. density)")
     L.append("align_events.py      -> aligned_events.json")
-    L.append("analyze_decay.py     -> analysis_results.json")
+    L.append("analyze_decay.py     -> analysis_results.json (incl. OLS)")
     L.append("visualize_decay.py   -> plots/*.png")
     L.append("generate_report.py   -> REPORT.md")
     L.append("```\n")
+
+    L.append("## Advanced Response Modeling (Technical Evidence)\n")
+    mv_reg = R.get("multivariate_regression", {})
+    if mv_reg:
+        L.append("### Multivariate Regression")
+        L.append("To isolate flare impact from background geomagnetic state ($K_p$) and solar flux ($F_{10.7}$), a multivariate OLS model was constructed.")
+        L.append(f"- **Adjusted R-squared**: {mv_reg.get('adj_r_squared')}")
+        L.append("- **Significant Predictors**: " + ", ".join([k for k,v in mv_reg.get('pvalues', {}).items() if v < 0.05]) + "\n")
+    
+    sens = R.get("sensitivity_analysis", {})
+    if sens:
+        L.append("### Sensitivity Analysis (Maneuver Rejection)")
+        L.append("Results were validated across multiple maneuver rejection thresholds (100-2000m) to ensure stability.")
+        L.append("| Threshold (m/day) | N Points | Mean Decay |")
+        L.append("|-------------------|----------|------------|")
+        for t in sorted(sens.keys(), key=int):
+            d = sens[t]
+            L.append(f"| {t} | {d['n_points']:,} | {d['mean_decay']:.1f} |")
+        L.append("\n")
 
     text = "\n".join(L)
     with open(config.REPORT_FILE, "w", encoding="utf-8") as f:
         f.write(text)
     print(f"\n  Report: {config.REPORT_FILE}")
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()
