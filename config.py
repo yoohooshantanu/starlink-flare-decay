@@ -14,7 +14,7 @@ SPACETRACK_PASSWORD = os.getenv("SPACETRACK_PASSWORD", "")
 
 # ── Date Range ───────────────────────────────────────────────────────────────
 START_DATE = "2022-01-01"
-END_DATE = "2025-12-31"
+END_DATE = "2024-12-31"
 
 # ── Flare Filtering ─────────────────────────────────────────────────────────
 MIN_FLARE_CLASS = "M1.0"            # Keep M1.0 and above

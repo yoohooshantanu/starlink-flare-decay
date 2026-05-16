@@ -88,7 +88,7 @@ def plot_flare_timeline(flares):
                     fontsize=9, color=color, ha="right", fontweight="bold")
 
     ax.set_ylabel("Flare Count (monthly)")
-    ax.set_title("M & X-Class Solar Flare Activity (2022-2025)",
+    ax.set_title("M & X-Class Solar Flare Activity (2022-2024)",
                  fontsize=14, fontweight="bold", pad=12)
     ax.legend(loc="upper left", framealpha=0.7)
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
@@ -307,19 +307,33 @@ def plot_recovery_time():
     ordered = ["M1-M5", "M5-M9", "X1-X5", "X5+"]
     colors = {"M1-M5": ACCENT1, "M5-M9": ACCENT4, "X1-X5": ACCENT2, "X5+": ACCENT5}
 
-    for grp in ordered:
-        data = [r["recovery_days"] for r in recovery
-                if r["recovered"] and r.get("flare_group") == grp]
-        if not data: continue
-        ax.hist(data, bins=range(3, 31), alpha=0.5, color=colors[grp],
-                label=f"{grp} (n={len(data)}, med={np.median(data):.0f}d)",
-                edgecolor=colors[grp], linewidth=0.5)
-
+    recovery_df = []
+    for r in recovery:
+        if r["recovered"] and r.get("flare_group") in ordered:
+            recovery_df.append(r)
+    
+    if not recovery_df:
+        print("  skip 05 — no valid recovery records"); return
+        
+    df = pd.DataFrame(recovery_df)
+    
+    sns.histplot(data=df, x="recovery_days", hue="flare_group", 
+                 hue_order=ordered, palette=colors, 
+                 element="step", fill=True, alpha=0.2, kde=True,
+                 bins=range(3, 31), ax=ax)
+    
+    # Custom legend to include n and median
+    handles, labels = ax.get_legend_handles_labels()
+    new_labels = []
+    for lbl in labels:
+        grp_data = df[df["flare_group"] == lbl]["recovery_days"]
+        new_labels.append(f"{lbl} (n={len(grp_data):,}, med={grp_data.median():.0f}d)")
+    
+    ax.legend(handles=handles, labels=new_labels, framealpha=0.7, fontsize=10)
     ax.set_xlabel("Days to Recovery (within 1-sigma of baseline)")
     ax.set_ylabel("Count")
     ax.set_title("Post-Flare Recovery Time Distribution by Flare Class",
                  fontsize=14, fontweight="bold", pad=12)
-    ax.legend(framealpha=0.7, fontsize=10)
     ax.set_xlim(3, 30)
     plt.savefig(config.PLOT_FILES["recovery_time"])
     plt.close()
@@ -327,29 +341,16 @@ def plot_recovery_time():
 
 
 # ── New Plot 6: Ensemble Response Curve (Aggregated t=0 response) ───────────
-def plot_ensemble_response(aligned):
+def plot_ensemble_response(analysis_results):
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # We need to compute the daily mean relative to flare peak across ALL events
-    # This data isn't directly in 'aligned' in a time-series format, 
-    # but we can approximate it if 'aligned' had day-by-day offsets.
-    # Since 'aligned' only has window means, we'll use the 'decay_data' 
-    # and align it to flare peaks manually for a sample.
-    print("  Generating Ensemble Response Curve...")
-    
-    # To keep it efficient, we'll use a subset of events
-    # Or if we have 'aligned_events.json' raw data, we'd use that.
-    # Let's assume we can compute a "Super-Flare" average response.
-    
-    # Placeholder: In a real scenario, this would iterate over all (flare, satellite) pairs
-    # and bin decay rates by day-offset from peak.
-    
-    # For now, let's create a stylized version based on the known results:
-    # 8.5 baseline -> 13.0 peak -> 3 day recovery
-    t = np.arange(-7, 15)  # 22 points
-    response = np.array([8.5]*7 + [13.0, 12.5, 11.0, 10.0, 9.5, 9.0, 8.7, 8.5, 8.5, 8.5, 8.5, 8.5, 8.5, 8.5, 8.5])
-    # Add some noise/uncertainty
-    sem = np.array([0.4]*7 + [1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2])
+    if "ensemble_response" not in analysis_results:
+        print("  skip 06 — ensemble_response data not found"); return
+
+    data = analysis_results["ensemble_response"]
+    t = np.array([d["offset"] for d in data])
+    response = np.array([d["mean"] for d in data])
+    sem = np.array([d["sem"] for d in data])
     
     ax.plot(t, response, color=ACCENT2, linewidth=3, label="Ensemble Mean Response")
     ax.fill_between(t, response - 1.96*sem, response + 1.96*sem, color=ACCENT2, alpha=0.2, label="95% CI")
@@ -360,7 +361,9 @@ def plot_ensemble_response(aligned):
     ax.set_title("Ensemble Orbital Response Curve (Multi-Event Aggregation)", 
                  fontsize=14, fontweight="bold", pad=12)
     ax.legend()
-    ax.set_ylim(0, 16)
+    # Dynamic y-axis scaling
+    ax.set_ylim(max(0, response.min() - 5), response.max() + 5)
+    
     plt.savefig(config.PLOT_FILES["ensemble_response"])
     plt.close()
     print("  done 06_ensemble_response.png")
@@ -370,15 +373,15 @@ def plot_ensemble_response(aligned):
 def plot_regression_residuals(analysis_results):
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
-    # Simulated residuals based on R-squared 0.01 and N=229k
-    # (Since we don't want to re-run the whole regression here)
-    print("  Generating Regression Diagnostics...")
-    
-    np.random.seed(42)
-    residuals = np.random.normal(0, 15, 5000) # subset for plotting
+    if "regression_diagnostics" not in analysis_results:
+        print("  skip 07 — diagnostics data not found"); return
+
+    diag = analysis_results["regression_diagnostics"]
+    fitted = np.array(diag["fitted"])
+    residuals = np.array(diag["residuals"])
     
     # Residual Plot
-    axes[0].scatter(np.random.uniform(0, 50, 5000), residuals, alpha=0.2, s=5, color=ACCENT1)
+    axes[0].scatter(fitted, residuals, alpha=0.2, s=5, color=ACCENT1)
     axes[0].axhline(0, color=ACCENT5, linestyle="--")
     axes[0].set_title("Residuals vs. Fitted Values")
     axes[0].set_xlabel("Fitted Decay Rate (m/day)")
@@ -398,16 +401,22 @@ def plot_regression_residuals(analysis_results):
 def plot_lag_correlation(analysis_results):
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Theoretical cross-correlation based on lag analysis results
-    lags = np.arange(0, 11)
-    # Correlation peaks at 3 days (median lag)
-    correlation = [0.1, 0.15, 0.25, 0.32, 0.28, 0.22, 0.15, 0.1, 0.05, 0.02, 0.01]
+    if "lag_correlation_curve" not in analysis_results:
+        print("  skip 08 — lag correlation data not found"); return
+
+    data = analysis_results["lag_correlation_curve"]
+    lags = np.array([d["lag"] for d in data])
+    correlation = np.array([d["r"] for d in data])
     
     ax.plot(lags, correlation, marker='o', linestyle='-', color=ACCENT3, linewidth=2.5)
-    ax.axvline(3, color=ACCENT5, linestyle="--", label="Median Lag (3d)")
+    
+    # Find peak lag
+    peak_idx = np.argmax(correlation)
+    peak_lag = lags[peak_idx]
+    ax.axvline(peak_lag, color=ACCENT5, linestyle="--", label=f"Peak Lag ({peak_lag}d)")
     
     ax.set_xlabel("Lag (Days after Flare Peak)")
-    ax.set_ylabel("Cross-Correlation Coefficient")
+    ax.set_ylabel("Cross-Correlation Coefficient (Pearson r)")
     ax.set_title("Lag-Response Correlation: Solar Flare to Orbital Decay", 
                  fontsize=14, fontweight="bold", pad=12)
     ax.set_xticks(lags)
@@ -421,23 +430,22 @@ def plot_lag_correlation(analysis_results):
 def plot_env_validation(analysis_results):
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
-    print("  Generating Environmental Predictor Correlations...")
+    if "environmental_data" not in analysis_results:
+        print("  skip 09 — environmental data not found"); return
+
+    data = analysis_results["environmental_data"]
+    x_kp = np.array(data["kp_sum"])
+    y = np.array(data["decay_rate"])
+    x_f107 = np.array(data["f107"])
     
-    # simulated correlation data
-    x_kp = np.linspace(0, 60, 100)
-    y_kp = 5 + 0.15 * x_kp + np.random.normal(0, 2, 100)
-    
-    x_f107 = np.linspace(70, 250, 100)
-    y_f107 = 2 + 0.05 * x_f107 + np.random.normal(0, 3, 100)
-    
-    axes[0].scatter(x_kp, y_kp, color=ACCENT1, alpha=0.6)
-    sns.regplot(x=x_kp, y=y_kp, ax=axes[0], color=ACCENT1, scatter=False, line_kws={"linewidth": 2})
+    axes[0].scatter(x_kp, y, color=ACCENT1, alpha=0.3, s=10)
+    sns.regplot(x=x_kp, y=y, ax=axes[0], color=ACCENT1, scatter=False, line_kws={"linewidth": 2})
     axes[0].set_title("Decay Rate vs. Geomagnetic Index (Kp)")
     axes[0].set_xlabel("Daily Kp Sum")
     axes[0].set_ylabel("Mean Decay Rate (m/day)")
     
-    axes[1].scatter(x_f107, y_f107, color=ACCENT4, alpha=0.6)
-    sns.regplot(x=x_f107, y=y_f107, ax=axes[1], color=ACCENT4, scatter=False, line_kws={"linewidth": 2})
+    axes[1].scatter(x_f107, y, color=ACCENT4, alpha=0.3, s=10)
+    sns.regplot(x=x_f107, y=y, ax=axes[1], color=ACCENT4, scatter=False, line_kws={"linewidth": 2})
     axes[1].set_title("Decay Rate vs. Solar Flux (F10.7)")
     axes[1].set_xlabel("F10.7 Index (sfu)")
     axes[1].set_ylabel("Mean Decay Rate (m/day)")
@@ -464,12 +472,10 @@ def main():
     plot_decay_vs_flare_class(aligned)
     plot_case_events(decay_data)
     plot_recovery_time()
-    plot_ensemble_response(aligned)
-    
-    # Load analysis results for advanced plots
     if config.ANALYSIS_FILE.exists():
         with open(config.ANALYSIS_FILE) as f:
             res = json.load(f)
+        plot_ensemble_response(res)
         plot_regression_residuals(res)
         plot_lag_correlation(res)
         plot_env_validation(res)

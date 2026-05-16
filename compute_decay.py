@@ -206,7 +206,7 @@ def main():
     # Save
     with open(config.DECAY_FILE, "w") as f:
         json.dump(all_decay_data, f, indent=2)
-    print(f"\n  ✓ Saved to {config.DECAY_FILE}")
+    print(f"\n  OK Saved to {config.DECAY_FILE}")
 
 
 if __name__ == "__main__":

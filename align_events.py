@@ -83,12 +83,19 @@ def main():
     satellites = list(sat_decay.keys())
     print(f"  Satellites with decay data: {len(satellites)}")
 
+    # Pre-calculate satellite group mapping
+    sat_groups = {}
+    for nid, dates in sat_decay.items():
+        # Get group from any record
+        for dlist in dates.values():
+            if dlist:
+                sat_groups[nid] = dlist[0].get("group", "unknown")
+                break
+        else:
+            sat_groups[nid] = "unknown"
+
     # Detect overlapping / compound events
-    flare_dates = []
-    for fl in flares:
-        pt = parse_iso(fl.get("peakTime"))
-        if pt:
-            flare_dates.append(pt)
+    flare_dates = [parse_iso(fl.get("peakTime")) for fl in flares if parse_iso(fl.get("peakTime"))]
 
     # ── Align each flare × satellite ──
     aligned = []
@@ -163,12 +170,7 @@ def main():
                 if cme_abs is not None:
                     decay_ratio_cme = round(cme_abs / pre_abs, 4)
 
-            # Get satellite group
-            group = "unknown"
-            for rec in sat_dates.get(list(sat_dates.keys())[0], []):
-                group = rec.get("group", "unknown")
-                break
-
+            group = sat_groups[norad_id]
             aligned.append({
                 "norad_id":          norad_id,
                 "group":             group,
@@ -200,7 +202,7 @@ def main():
     # Save
     with open(config.ALIGNED_FILE, "w") as f:
         json.dump(aligned, f, indent=2)
-    print(f"\n  ✓ Saved to {config.ALIGNED_FILE}")
+    print(f"\n  OK Saved to {config.ALIGNED_FILE}")
 
 
 if __name__ == "__main__":

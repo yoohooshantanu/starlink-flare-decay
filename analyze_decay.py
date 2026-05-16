@@ -137,6 +137,99 @@ def compute_recovery_days(aligned_records, decay_data_by_sat):
     return recovery_results
 
 
+def compute_ensemble_response(flares, decay_by_sat, start_offset=-7, end_offset=15):
+    """
+    Aggregates daily decay rates across all flare-satellite pairs to compute
+    the mean response curve relative to flare peak (t=0).
+    """
+    # Pre-calculate 7-day rolling means for each satellite to optimize the loop
+    sat_rolling_means = defaultdict(dict)
+    for nid, sat_dates in decay_by_sat.items():
+        # Get all dates sorted
+        dates_sorted = sorted(sat_dates.keys())
+        # Compute mean for each day
+        daily_means = {d: np.mean([r["decay_rate_m_day"] for r in sat_dates[d] if not r.get("is_maneuver", False)]) 
+                       for d in dates_sorted if any(not r.get("is_maneuver", False) for r in sat_dates[d])}
+        
+        # Compute 7-day rolling mean for each day in daily_means
+        for i, d in enumerate(dates_sorted):
+            dt = datetime.strptime(d, "%Y-%m-%d")
+            window_vals = []
+            for off in range(-3, 4):
+                td = (dt + timedelta(days=off)).strftime("%Y-%m-%d")
+                if td in daily_means:
+                    window_vals.append(daily_means[td])
+            if window_vals:
+                sat_rolling_means[nid][d] = np.mean(window_vals)
+
+    offsets = range(start_offset, end_offset + 1)
+    daily_stats = {o: [] for o in offsets}
+
+    for flare in flares:
+        peak_str = flare.get("peakTime")
+        if not peak_str: continue
+        try:
+            peak_dt = datetime.strptime(peak_str.rstrip("Z")[:10], "%Y-%m-%d")
+        except ValueError: continue
+
+        for nid in sat_rolling_means:
+            for offset in offsets:
+                target_date = (peak_dt + timedelta(days=offset)).strftime("%Y-%m-%d")
+                if target_date in sat_rolling_means[nid]:
+                    # Match Q1 (windowed mean magnitude)
+                    daily_stats[offset].append(abs(sat_rolling_means[nid][target_date]))
+
+    result = []
+    for offset in sorted(daily_stats.keys()):
+        data = daily_stats[offset]
+        if data:
+            result.append({
+                "offset": offset,
+                "mean": round(float(np.mean(data)), 4),
+                "sem": round(float(sp_stats.sem(data)), 4),
+                "n": len(data)
+            })
+    return result
+
+
+def compute_lag_correlation(flares, decay_by_sat, max_lag=10):
+    """
+    Computes cross-correlation between flare intensity and absolute decay rate
+    for lags from 0 to max_lag days.
+    """
+    lag_data = {lag: {"intensities": [], "rates": []} for lag in range(max_lag + 1)}
+
+    for flare in flares:
+        intensity = flare.get("numericIntensity", 0)
+        if intensity <= 0: continue
+        
+        peak_str = flare.get("peakTime")
+        if not peak_str: continue
+        try:
+            peak_dt = datetime.strptime(peak_str.rstrip("Z")[:10], "%Y-%m-%d")
+        except ValueError: continue
+
+        for nid, sat_dates in decay_by_sat.items():
+            for lag in range(max_lag + 1):
+                target_date = (peak_dt + timedelta(days=lag)).strftime("%Y-%m-%d")
+                if target_date in sat_dates:
+                    rates = [r["decay_rate_m_day"] for r in sat_dates[target_date] 
+                             if not r.get("is_maneuver", False)]
+                    if rates:
+                        lag_data[lag]["intensities"].append(np.log10(intensity + 0.1))
+                        lag_data[lag]["rates"].append(abs(np.mean(rates)))
+
+    correlations = []
+    for lag in range(max_lag + 1):
+        if len(lag_data[lag]["intensities"]) > 5:
+            r, p = sp_stats.pearsonr(lag_data[lag]["intensities"], lag_data[lag]["rates"])
+            correlations.append({"lag": lag, "r": round(float(r), 4), "p": round(float(p), 6)})
+        else:
+            correlations.append({"lag": lag, "r": 0.0, "p": 1.0})
+    
+    return correlations
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -148,6 +241,8 @@ def main():
         aligned = json.load(f)
     with open(config.DECAY_FILE) as f:
         decay_data = json.load(f)
+    with open(config.FLARE_FILE) as f:
+        flares = json.load(f)
     
     # Load space weather indices
     sw_file = config.DATA_DIR / "space_weather.json"
@@ -253,6 +348,12 @@ def main():
             pairwise[key] = pw
     results["q2_flare_class_scaling"]["pairwise_mannwhitney"] = pairwise
 
+    # -- Point 2.5: Ensemble Response Curve --
+    print("\n  -- Q2.5: Ensemble Response Curve --")
+    ensemble_data = compute_ensemble_response(flares, decay_by_sat)
+    results["ensemble_response"] = ensemble_data
+    print(f"    Computed response for {len(ensemble_data)} offsets")
+
     # -- Point 2.6: Lag Analysis (Peak Decay Delay) --
     print("\n  -- Q2.6: Lag Analysis (Peak Decay Delay) --")
     lag_days = []
@@ -292,6 +393,12 @@ def main():
         }
         print(f"    Mean lag={mean_lag:.2f} days, Median={median_lag:.0f} days, Mode={mode_lag:.0f} days")
 
+    # -- Point 2.7: Lag Correlation Curve --
+    print("\n  -- Q2.7: Lag Correlation Curve --")
+    lag_corr = compute_lag_correlation(flares, decay_by_sat)
+    results["lag_correlation_curve"] = lag_corr
+    print(f"    Computed correlation for lags 0-10")
+
     # -- Point 2: Multivariate Regression --
     print("\n  -- Point 2: Multivariate Regression --")
     mv_records = []
@@ -319,6 +426,23 @@ def main():
             "params": {k: round(float(v), 4) for k, v in model.params.items()},
             "pvalues": {k: round(float(v), 8) for k, v in model.pvalues.items()},
             "summary_text": str(model.summary())
+        }
+        
+        # Diagnostics for Plot 7
+        # Subset to 5000 points if huge to keep JSON size reasonable
+        diag_df = df.sample(min(5000, len(df))).copy()
+        diag_X = sm.add_constant(diag_df[["log_intensity", "kp_sum", "f107", "altitude", "is_shell2"]])
+        diag_model_res = model.predict(diag_X)
+        results["regression_diagnostics"] = {
+            "fitted": [round(float(x), 4) for x in diag_model_res],
+            "residuals": [round(float(y - f), 4) for y, f in zip(diag_df["decay_rate"], diag_model_res)]
+        }
+
+        # Raw data for Plot 9
+        results["environmental_data"] = {
+            "kp_sum": [round(float(x), 2) for x in diag_df["kp_sum"]],
+            "f107": [round(float(x), 2) for x in diag_df["f107"]],
+            "decay_rate": [round(float(x), 4) for x in diag_df["decay_rate"]]
         }
         print(f"    Multivariate R^2: {model.rsquared:.4f}")
 
@@ -363,7 +487,7 @@ def main():
     # ======================================================================
     print("\n  -- Q4: Recovery time (days-to-recovery) --")
 
-    recovery_results = compute_recovery_days(aligned, decay_by_sat)
+    recovery_results = compute_recovery_days(starlink, decay_by_sat)
 
     recovery_by_group = defaultdict(list)
     for r in recovery_results:
@@ -444,17 +568,28 @@ def main():
     thresholds = [100, 250, 500, 1000, 2000]
     sensitivity_results = {}
     for t in thresholds:
-        filtered_starlink = []
-        for d in decay_data:
-            if d["group"] in ("shell1", "shell2") and d["decay_rate_m_day"] < t:
-                filtered_starlink.append(abs(d["decay_rate_m_day"]))
-        if filtered_starlink:
+        flare_vals, base_vals = [], []
+        for a in starlink:
+            # Re-apply threshold filtering to pre and flare rates
+            p_mean = a["pre_rate"]["mean"]
+            f_mean = a["flare_rate"]["mean"]
+            if p_mean is not None and abs(p_mean) < t:
+                base_vals.append(abs(p_mean))
+            if f_mean is not None and abs(f_mean) < t:
+                flare_vals.append(abs(f_mean))
+        
+        if flare_vals and base_vals:
+            m_flare = np.mean(flare_vals)
+            m_base = np.mean(base_vals)
+            ratio = m_flare / m_base if m_base > 0 else 0
             sensitivity_results[str(t)] = {
-                "n_points": len(filtered_starlink),
-                "mean_decay": round(float(np.mean(filtered_starlink)), 2),
-                "median_decay": round(float(np.median(filtered_starlink)), 2)
+                "n_flare": len(flare_vals),
+                "n_base": len(base_vals),
+                "flare_mean": round(float(m_flare), 2),
+                "base_mean": round(float(m_base), 2),
+                "ratio": round(float(ratio), 3)
             }
-            print(f"    Threshold {t:4} m/day: n={len(filtered_starlink):6}, mean={np.mean(filtered_starlink):.2f}")
+            print(f"    Threshold {t:4} m/day: ratio={ratio:.3f}, flare_mean={m_flare:.2f}")
     results["sensitivity_analysis"] = sensitivity_results
 
     # Save
